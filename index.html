@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GrowUP CX - Mentee Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'rag-red': {
+              '100': '#FEE2E2',
+              '500': '#EF4444',
+              '800': '#991B1B',
+            },
+            'rag-yellow': {
+              '100': '#FEF3C7',
+              '500': '#F59E0B',
+              '800': '#92400E',
+            },
+            'rag-blue': {
+              '100': '#DBEAFE',
+              '500': '#3B82F6',
+              '800': '#1E40AF',
+            },
+            'rag-green': {
+              '100': '#D1FAE5',
+              '500': '#10B981',
+              '800': '#065F46',
+            },
+          }
+        }
+      }
+    }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>

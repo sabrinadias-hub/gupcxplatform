@@ -1,0 +1,5 @@
+{
+  "name": "GrowUP CX - Mentee Dashboard",
+  "description": "A comprehensive dashboard for mentors to track and manage the progress of their mentees based on the RAG+ diagnostic. It provides an at-a-glance view of a mentee's business maturity across 8 key pillars, with detailed metrics and visualizations.",
+  "requestFramePermissions": []
+}
