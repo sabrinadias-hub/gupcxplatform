@@ -1,26 +1,22 @@
 import React, { useState } from 'react';
-import type { MaturityLevel } from '../types';
+import { DIAGNOSIS_AXES, getMaturityLevel } from '../lib/diagnosisData';
 
-interface PillarAssessment {
-  name: string;
+interface AxisResponse {
+  axisId: string;
+  axisName: string;
+  questionId: string;
+  questionText: string;
+  response: string;
   score: number;
-  maturityLevel: MaturityLevel;
 }
 
 interface DiagnosisFlowProps {
-  onComplete: (menteeName: string, programId: string, assessments: PillarAssessment[]) => void;
+  onComplete: (
+    menteeName: string,
+    programId: string,
+    responses: AxisResponse[]
+  ) => void;
 }
-
-const PILLARS = [
-  'Sócios',
-  'Finanças',
-  'Folha',
-  'Clientes',
-  'Vendas',
-  'IA & Automação',
-  'Reforma Tributária',
-  'Estratégia'
-];
 
 const PROGRAMS = [
   { id: 'prog-start', name: 'START' },
@@ -28,20 +24,20 @@ const PROGRAMS = [
   { id: 'prog-hibrido', name: 'HÍBRIDO' }
 ];
 
-const getMaturityLevel = (score: number): MaturityLevel => {
-  if (score < 2) return 'red';
-  if (score < 3) return 'yellow';
-  if (score < 4) return 'blue';
-  return 'green';
-};
-
 const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const [menteeName, setMenteeName] = useState('');
   const [programId, setProgramId] = useState('prog-start');
-  const [currentPillarIndex, setCurrentPillarIndex] = useState(0);
-  const [assessments, setAssessments] = useState<PillarAssessment[]>([]);
-  const [currentScore, setCurrentScore] = useState(0);
+  const [currentAxisIndex, setCurrentAxisIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [allResponses, setAllResponses] = useState<AxisResponse[]>([]);
+  const [currentResponse, setCurrentResponse] = useState('');
+
+  const currentAxis = DIAGNOSIS_AXES[currentAxisIndex];
+  const currentQuestion = currentAxis?.questions[currentQuestionIndex];
+  const totalQuestions = DIAGNOSIS_AXES.reduce((sum, axis) => sum + axis.questions.length, 0);
+  const answeredQuestions = allResponses.length;
+  const progress = (answeredQuestions / totalQuestions) * 100;
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,40 +51,88 @@ const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
     setStep(2);
   };
 
-  const handleScoreSubmit = () => {
-    const newAssessment: PillarAssessment = {
-      name: PILLARS[currentPillarIndex],
-      score: currentScore,
-      maturityLevel: getMaturityLevel(currentScore)
+  const handleQuestionSubmit = () => {
+    if (!currentResponse.trim()) {
+      alert('Por favor, forneça uma resposta antes de continuar.');
+      return;
+    }
+
+    const score = calculateScoreFromResponse(currentResponse);
+
+    const response: AxisResponse = {
+      axisId: currentAxis.id,
+      axisName: currentAxis.name,
+      questionId: currentQuestion.id,
+      questionText: currentQuestion.text,
+      response: currentResponse,
+      score
     };
 
-    const newAssessments = [...assessments, newAssessment];
-    setAssessments(newAssessments);
+    const newResponses = [...allResponses, response];
+    setAllResponses(newResponses);
+    setCurrentResponse('');
 
-    if (currentPillarIndex < PILLARS.length - 1) {
-      setCurrentPillarIndex(currentPillarIndex + 1);
-      setCurrentScore(0);
+    if (currentQuestionIndex < currentAxis.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else if (currentAxisIndex < DIAGNOSIS_AXES.length - 1) {
+      setCurrentAxisIndex(currentAxisIndex + 1);
+      setCurrentQuestionIndex(0);
     } else {
-      onComplete(menteeName, programId, newAssessments);
+      onComplete(menteeName, programId, newResponses);
     }
   };
 
-  const progress = step === 2 ? ((currentPillarIndex + 1) / PILLARS.length) * 100 : 0;
+  const handleBack = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      const previousResponse = allResponses[allResponses.length - 1];
+      setCurrentResponse(previousResponse?.response || '');
+      setAllResponses(allResponses.slice(0, -1));
+    } else if (currentAxisIndex > 0) {
+      const previousAxis = DIAGNOSIS_AXES[currentAxisIndex - 1];
+      setCurrentAxisIndex(currentAxisIndex - 1);
+      setCurrentQuestionIndex(previousAxis.questions.length - 1);
+      const previousResponse = allResponses[allResponses.length - 1];
+      setCurrentResponse(previousResponse?.response || '');
+      setAllResponses(allResponses.slice(0, -1));
+    }
+  };
+
+  const calculateScoreFromResponse = (response: string): number => {
+    const lowerResponse = response.toLowerCase();
+
+    if (lowerResponse.includes('não') || lowerResponse.includes('nao') ||
+        lowerResponse.includes('sem') || lowerResponse.includes('nunca')) {
+      return 1.0;
+    }
+
+    if (lowerResponse.includes('às vezes') || lowerResponse.includes('parcial') ||
+        lowerResponse.includes('básico') || lowerResponse.includes('pouco')) {
+      return 2.5;
+    }
+
+    if (lowerResponse.includes('sim') || lowerResponse.includes('possui') ||
+        lowerResponse.includes('realiza') || lowerResponse.includes('tem')) {
+      return 4.0;
+    }
+
+    return 3.0;
+  };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-100 to-slate-200 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-100 to-slate-200 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl p-8 my-8">
         {step === 0 && (
           <div className="space-y-6">
             <div className="text-center">
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Bem-vindo ao GrowUp CX</h1>
-              <p className="text-slate-600">Vamos começar sua jornada de diagnóstico</p>
+              <p className="text-slate-600">Vamos começar sua jornada de diagnóstico empresarial</p>
             </div>
 
             <form onSubmit={handleNameSubmit} className="space-y-4">
               <div>
                 <label htmlFor="menteeName" className="block text-sm font-medium text-slate-700 mb-2">
-                  Qual é o seu nome?
+                  Qual é o nome do mentorado?
                 </label>
                 <input
                   type="text"
@@ -96,7 +140,7 @@ const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
                   value={menteeName}
                   onChange={(e) => setMenteeName(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-                  placeholder="Digite seu nome completo"
+                  placeholder="Digite o nome completo"
                   autoFocus
                   required
                 />
@@ -153,13 +197,18 @@ const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && currentAxis && currentQuestion && (
           <div className="space-y-6">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold text-slate-800">Diagnóstico de Maturidade</h2>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">{currentAxis.name}</h2>
+                  <p className="text-sm text-slate-500">
+                    Questão {currentQuestionIndex + 1} de {currentAxis.questions.length}
+                  </p>
+                </div>
                 <span className="text-sm text-slate-600">
-                  {currentPillarIndex + 1} de {PILLARS.length}
+                  {answeredQuestions} / {totalQuestions}
                 </span>
               </div>
 
@@ -171,60 +220,32 @@ const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
               </div>
             </div>
 
-            <div className="text-center py-8">
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">
-                {PILLARS[currentPillarIndex]}
+            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-800 mb-4">
+                {currentQuestion.text}
               </h3>
-              <p className="text-slate-600 mb-8">
-                Avalie o nível atual de maturidade deste pilar
-              </p>
 
-              <div className="space-y-6">
-                <div className="flex justify-between items-center px-4">
-                  <span className="text-sm text-slate-600">0</span>
-                  <span className="text-4xl font-bold text-blue-600">{currentScore.toFixed(1)}</span>
-                  <span className="text-sm text-slate-600">5</span>
-                </div>
+              <textarea
+                value={currentResponse}
+                onChange={(e) => setCurrentResponse(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={4}
+                placeholder="Descreva a situação atual da empresa em relação a esta questão..."
+                autoFocus
+              />
 
-                <input
-                  type="range"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={currentScore}
-                  onChange={(e) => setCurrentScore(parseFloat(e.target.value))}
-                  className="w-full h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-
-                <div className="grid grid-cols-4 gap-2 text-xs text-slate-600">
-                  <div className="text-center">
-                    <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-1"></div>
-                    <span>0-2: Inicial</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-4 h-4 bg-yellow-500 rounded-full mx-auto mb-1"></div>
-                    <span>2-3: Em Desenvolvimento</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-4 h-4 bg-blue-500 rounded-full mx-auto mb-1"></div>
-                    <span>3-4: Avançado</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-1"></div>
-                    <span>4-5: Excelente</span>
-                  </div>
-                </div>
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Dica:</strong> Seja específico e detalhado. Quanto mais informações você fornecer,
+                  melhor será o diagnóstico e as recomendações personalizadas.
+                </p>
               </div>
             </div>
 
             <div className="flex gap-3">
-              {currentPillarIndex > 0 && (
+              {(currentQuestionIndex > 0 || currentAxisIndex > 0) && (
                 <button
-                  onClick={() => {
-                    setCurrentPillarIndex(currentPillarIndex - 1);
-                    setCurrentScore(assessments[currentPillarIndex - 1]?.score || 0);
-                    setAssessments(assessments.slice(0, -1));
-                  }}
+                  onClick={handleBack}
                   className="flex-1 bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl hover:bg-slate-300 transition-colors duration-200"
                 >
                   Voltar
@@ -232,11 +253,21 @@ const DiagnosisFlow: React.FC<DiagnosisFlowProps> = ({ onComplete }) => {
               )}
 
               <button
-                onClick={handleScoreSubmit}
+                onClick={handleQuestionSubmit}
                 className="flex-1 bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:bg-blue-700 transition-colors duration-200"
               >
-                {currentPillarIndex < PILLARS.length - 1 ? 'Próximo Pilar' : 'Concluir Diagnóstico'}
+                {currentQuestionIndex < currentAxis.questions.length - 1
+                  ? 'Próxima Questão'
+                  : currentAxisIndex < DIAGNOSIS_AXES.length - 1
+                  ? 'Próximo Eixo'
+                  : 'Concluir Diagnóstico'}
               </button>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm text-slate-500">
+                Eixo {currentAxisIndex + 1} de {DIAGNOSIS_AXES.length}
+              </p>
             </div>
           </div>
         )}

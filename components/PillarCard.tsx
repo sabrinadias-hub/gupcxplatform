@@ -5,6 +5,7 @@ import { PlusCircleIcon } from '../constants';
 interface PillarCardProps {
   pillar: Pillar;
   onSprintCreate: (pillar: Pillar) => void;
+  onViewDetails: (pillar: Pillar) => void;
 }
 
 const maturityStyles: { [key in MaturityLevel]: { bg: string; text: string; name: string } } = {
@@ -14,11 +15,14 @@ const maturityStyles: { [key in MaturityLevel]: { bg: string; text: string; name
   green: { bg: 'bg-rag-green-100', text: 'text-rag-green-800', name: 'Excelência' },
 };
 
-const PillarCard: React.FC<PillarCardProps> = ({ pillar, onSprintCreate }) => {
+const PillarCard: React.FC<PillarCardProps> = ({ pillar, onSprintCreate, onViewDetails }) => {
   const styles = maturityStyles[pillar.maturityLevel];
 
   return (
-    <div className="group relative flex flex-col justify-between p-4 rounded-xl border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer bg-slate-50/50">
+    <div
+      onClick={() => onViewDetails(pillar)}
+      className="group relative flex flex-col justify-between p-4 rounded-xl border border-slate-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer bg-slate-50/50"
+    >
       <div>
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${styles.bg} ${styles.text}`}>
           {pillar.icon}

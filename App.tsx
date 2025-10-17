@@ -6,10 +6,12 @@ import PillarCard from './components/PillarCard';
 import SprintStructure from './components/SprintStructure';
 import SprintPlanningModal from './components/SprintPlanningModal';
 import DiagnosisFlow from './components/DiagnosisFlow';
+import PillarDetailsModal from './components/PillarDetailsModal';
 import { PROGRAMS } from './constants';
 import { ChartBarIcon, CheckCircleIcon, RocketLaunchIcon, UsersIcon, CurrencyDollarIcon, ClipboardListIcon, UserGroupIcon, TrendingUpIcon, LightBulbIcon, ScaleIcon } from './constants';
 import type { Pillar, Sprint, MaturityLevel } from './types';
 import { supabase } from './lib/supabase';
+import { getMaturityLevel } from './lib/diagnosisData';
 
 const PILLAR_ICONS: { [key: string]: React.ReactNode } = {
   'Sócios': <UsersIcon />,
@@ -30,6 +32,7 @@ const App: React.FC = () => {
   const [currentProgramId, setCurrentProgramId] = useState('prog-start');
   const [pillars, setPillars] = useState<Pillar[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState<Pillar | null>(null);
 
   useEffect(() => {
@@ -91,7 +94,14 @@ const App: React.FC = () => {
   const handleDiagnosisComplete = async (
     name: string,
     programId: string,
-    assessments: Array<{ name: string; score: number; maturityLevel: MaturityLevel }>
+    responses: Array<{
+      axisId: string;
+      axisName: string;
+      questionId: string;
+      questionText: string;
+      response: string;
+      score: number;
+    }>
   ) => {
     try {
       const { data: newMentee, error: menteeError } = await supabase
@@ -106,15 +116,49 @@ const App: React.FC = () => {
 
       if (menteeError) throw menteeError;
 
-      const pillarInserts = assessments.map((assessment) => ({
+      const responseInserts = responses.map((r) => ({
         mentee_id: newMentee.id,
-        name: assessment.name,
-        score: assessment.score,
-        maturity_level: assessment.maturityLevel,
-        sprints: 0,
-        tasks_completed: 0,
-        tasks_total: 0,
+        axis_id: r.axisId,
+        axis_name: r.axisName,
+        question_id: r.questionId,
+        question_text: r.questionText,
+        response: r.response,
+        score: r.score
       }));
+
+      const { error: responsesError } = await supabase
+        .from('diagnosis_responses')
+        .insert(responseInserts);
+
+      if (responsesError) throw responsesError;
+
+      const axisScores = responses.reduce((acc, r) => {
+        if (!acc[r.axisName]) {
+          acc[r.axisName] = { total: 0, count: 0 };
+        }
+        acc[r.axisName].total += r.score;
+        acc[r.axisName].count += 1;
+        return acc;
+      }, {} as Record<string, { total: number; count: number }>);
+
+      const pillarInserts = Object.entries(axisScores).map(([axisName, { total, count }]) => {
+        const avgScore = total / count;
+        const findings = responses
+          .filter(r => r.axisName === axisName)
+          .map(r => `${r.questionText}: ${r.response}`)
+          .join('\n\n');
+
+        return {
+          mentee_id: newMentee.id,
+          name: axisName,
+          score: avgScore,
+          maturity_level: getMaturityLevel(avgScore),
+          findings,
+          sprints: 0,
+          tasks_completed: 0,
+          tasks_total: 0,
+        };
+      });
 
       const { error: pillarsError } = await supabase
         .from('pillars')
@@ -140,6 +184,16 @@ const App: React.FC = () => {
 
   const handleCloseSprintModal = () => {
     setIsModalOpen(false);
+    setSelectedPillar(null);
+  };
+
+  const handleViewPillarDetails = (pillar: Pillar) => {
+    setSelectedPillar(pillar);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModalOpen(false);
     setSelectedPillar(null);
   };
 
@@ -265,7 +319,12 @@ const App: React.FC = () => {
                   {pillars.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {pillars.map((pillar: Pillar) => (
-                        <PillarCard key={pillar.name} pillar={pillar} onSprintCreate={handleOpenSprintModal} />
+                        <PillarCard
+                          key={pillar.name}
+                          pillar={pillar}
+                          onSprintCreate={handleOpenSprintModal}
+                          onViewDetails={handleViewPillarDetails}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -298,12 +357,19 @@ const App: React.FC = () => {
         </div>
       </div>
       
-      <SprintPlanningModal 
+      <SprintPlanningModal
         isOpen={isModalOpen}
         onClose={handleCloseSprintModal}
         pillar={selectedPillar}
         programName={currentProgram?.name || 'N/A'}
         onCreateSprint={handleCreateSprint}
+      />
+
+      <PillarDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={handleCloseDetailsModal}
+        pillar={selectedPillar}
+        menteeId={menteeId}
       />
     </>
   );
