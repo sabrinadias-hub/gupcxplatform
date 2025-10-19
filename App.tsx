@@ -94,13 +94,11 @@ const App: React.FC = () => {
   const handleDiagnosisComplete = async (
     name: string,
     programId: string,
-    responses: Array<{
+    assessments: Array<{
       axisId: string;
       axisName: string;
-      questionId: string;
-      questionText: string;
-      response: string;
-      score: number;
+      maturityLevel: MaturityLevel;
+      notes: string;
     }>
   ) => {
     try {
@@ -116,49 +114,23 @@ const App: React.FC = () => {
 
       if (menteeError) throw menteeError;
 
-      const responseInserts = responses.map((r) => ({
+      const maturityScores: Record<MaturityLevel, number> = {
+        red: 1.5,
+        yellow: 2.5,
+        blue: 3.5,
+        green: 4.5
+      };
+
+      const pillarInserts = assessments.map((assessment) => ({
         mentee_id: newMentee.id,
-        axis_id: r.axisId,
-        axis_name: r.axisName,
-        question_id: r.questionId,
-        question_text: r.questionText,
-        response: r.response,
-        score: r.score
+        name: assessment.axisName,
+        score: maturityScores[assessment.maturityLevel],
+        maturity_level: assessment.maturityLevel,
+        findings: assessment.notes || '',
+        sprints: 0,
+        tasks_completed: 0,
+        tasks_total: 0,
       }));
-
-      const { error: responsesError } = await supabase
-        .from('diagnosis_responses')
-        .insert(responseInserts);
-
-      if (responsesError) throw responsesError;
-
-      const axisScores = responses.reduce((acc, r) => {
-        if (!acc[r.axisName]) {
-          acc[r.axisName] = { total: 0, count: 0 };
-        }
-        acc[r.axisName].total += r.score;
-        acc[r.axisName].count += 1;
-        return acc;
-      }, {} as Record<string, { total: number; count: number }>);
-
-      const pillarInserts = Object.entries(axisScores).map(([axisName, { total, count }]) => {
-        const avgScore = total / count;
-        const findings = responses
-          .filter(r => r.axisName === axisName)
-          .map(r => `${r.questionText}: ${r.response}`)
-          .join('\n\n');
-
-        return {
-          mentee_id: newMentee.id,
-          name: axisName,
-          score: avgScore,
-          maturity_level: getMaturityLevel(avgScore),
-          findings,
-          sprints: 0,
-          tasks_completed: 0,
-          tasks_total: 0,
-        };
-      });
 
       const { error: pillarsError } = await supabase
         .from('pillars')

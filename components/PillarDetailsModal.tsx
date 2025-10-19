@@ -11,7 +11,6 @@ interface PillarDetailsModalProps {
 
 const PillarDetailsModal: React.FC<PillarDetailsModalProps> = ({ isOpen, onClose, pillar, menteeId }) => {
   const [findings, setFindings] = useState('');
-  const [responses, setResponses] = useState<Array<{ questionText: string; response: string; score: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -34,18 +33,7 @@ const PillarDetailsModal: React.FC<PillarDetailsModalProps> = ({ isOpen, onClose
 
       if (pillarError) throw pillarError;
 
-      setFindings(pillarData?.findings || 'Nenhuma informação de diagnóstico disponível.');
-
-      const { data: responsesData, error: responsesError } = await supabase
-        .from('diagnosis_responses')
-        .select('question_text, response, score')
-        .eq('mentee_id', menteeId)
-        .eq('axis_name', pillar.name)
-        .order('created_at', { ascending: true });
-
-      if (responsesError) throw responsesError;
-
-      setResponses(responsesData || []);
+      setFindings(pillarData?.findings || '');
     } catch (error) {
       console.error('Error loading pillar details:', error);
     } finally {
@@ -99,26 +87,20 @@ const PillarDetailsModal: React.FC<PillarDetailsModalProps> = ({ isOpen, onClose
             </div>
           ) : (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800 mb-3">Respostas do Diagnóstico</h3>
-                {responses.length > 0 ? (
-                  <div className="space-y-4">
-                    {responses.map((r, index) => (
-                      <div key={index} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-slate-800 flex-1">{r.questionText}</h4>
-                          <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-semibold">
-                            {r.score.toFixed(1)}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 text-sm whitespace-pre-wrap">{r.response}</p>
-                      </div>
-                    ))}
+              {findings && findings.trim() && (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800 mb-3">Observações do Diagnóstico</h3>
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                    <p className="text-slate-700 whitespace-pre-wrap">{findings}</p>
                   </div>
-                ) : (
-                  <p className="text-slate-500 italic">Nenhuma resposta de diagnóstico disponível para este pilar.</p>
-                )}
-              </div>
+                </div>
+              )}
+
+              {(!findings || !findings.trim()) && (
+                <div className="text-center py-8">
+                  <p className="text-slate-500 italic">Nenhuma observação registrada durante o diagnóstico.</p>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-slate-200">
                 <h3 className="text-lg font-semibold text-slate-800 mb-3">Estatísticas</h3>
